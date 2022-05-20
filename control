@@ -1,0 +1,9 @@
+Package: xyz.hgrunt.autoundelete
+Name: AutoUndelete
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Automatically recovers content in various Reddit clients
+Maintainer: IntriguingTiles
+Author: IntriguingTiles
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), preferenceloader (>= 2.2.3)

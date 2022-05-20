@@ -1,0 +1,8 @@
+---
+BasedOnStyle: Google
+IndentWidth: '4'
+Language: ObjC
+ObjCBlockIndentWidth: '4'
+PenaltyExcessCharacter: '1'
+
+...

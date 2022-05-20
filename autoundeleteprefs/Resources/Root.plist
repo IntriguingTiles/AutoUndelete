@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Global Settings</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>isEnabled</string>
+			<key>label</key>
+			<string>Enabled</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>shouldHighlight</string>
+			<key>label</key>
+			<string>Distinguish Recovered Content</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Enabled Apps</string>
+			<key>footerText</key>
+			<string>Enabling an app requires restarting the app.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>isApolloEnabled</string>
+			<key>label</key>
+			<string>Apollo Enabled</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>isAlienBlueEnabled</string>
+			<key>label</key>
+			<string>Alien Blue Enabled</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>isRedditEnabled</string>
+			<key>label</key>
+			<string>Reddit Enabled</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>isBaconReaderEnabled</string>
+			<key>label</key>
+			<string>BaconReader Enabled</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>isNarwhalEnabled</string>
+			<key>label</key>
+			<string>Narwhal Enabled</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>isSlideEnabled</string>
+			<key>label</key>
+			<string>Slide Enabled</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Advanced</string>
+			<key>footerText</key>
+			<string>Disabling this may cause loading times to increase.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>xyz.hgrunt.autoundelete</string>
+			<key>key</key>
+			<string>useIDs</string>
+			<key>label</key>
+			<string>Fetch via ID</string>
+			<key>PostNotification</key>
+			<string>xyz.hgrunt.autoundelete/preferences.changed</string>
+		</dict>
+
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Displays how far behind the ingest is (i.e. how long ago the most recently archived comment and post were created).</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>Check Latest Ingest Times</string>
+			<key>action</key>
+			<string>checkLatest:</string>
+		</dict>
+	</array>
+	<key>title</key>
+	<string>AutoUndelete</string>
+</dict>
+</plist>

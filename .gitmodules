@@ -1,0 +1,3 @@
+[submodule "tweak/snudown"]
+	path = tweak/snudown
+	url = https://github.com/IntriguingTiles/snudown

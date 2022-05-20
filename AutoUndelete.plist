@@ -1,0 +1,1 @@
+{ Filter = { Bundles = ( "com.christianselig.Apollo", "com.reddit.alienblue", "com.reddit.Reddit", "com.onelouder.BaconReader", "com.rickharrison.narwhal", "ccrama.me.redditslide" ); }; }
