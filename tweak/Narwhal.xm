@@ -1,5 +1,6 @@
 #import <Common.h>
 #import <Foundation/Foundation.h>
+#import <headers/Narwhal/MTLJSONAdapter.h>
 #import <headers/Narwhal/RKComment.h>
 #import <headers/Narwhal/RKLink.h>
 #import "substrate.h"
@@ -12,6 +13,7 @@ static BOOL useIDs;
 typedef void (^RKDictionaryCompletionBlock)(NSDictionary *collection, NSError *error);
 typedef void (^RKObjectCompletionBlock)(id object, NSError *error);
 typedef void (^RKArrayCompletionBlock)(NSArray *collection, NSError *error);
+typedef void (^RKListingCompletionBlock)(NSArray *collection, id pagination, NSError *error);
 
 static BOOL shouldUndelete(NSArray *comments) {
     for (RKComment *comment in comments) {
@@ -79,6 +81,8 @@ static void undeletePost(NSString *ident, RKLink *link) {
 
     if (post) {
         MSHookIvar<NSString *>(link, "_author") = post[@"author"];
+        MSHookIvar<NSString *>(link, "_title") = post[@"title"];
+        MSHookIvar<NSString *>(link, "_URL") = post[@"url"];
         // narwhal doesn't support author flair text, append to the title flair instead
         MSHookIvar<NSString *>(link, "_linkFlairText") =
             link.linkFlairText ? [NSString stringWithFormat:@"%@ | %@", link.linkFlairText, link.selfText]
@@ -137,7 +141,7 @@ static void undeletePost(NSString *ident, RKLink *link) {
 }
 
 - (id)moreComments:(id)arg1
-           forLink:(RKLink*)link
+           forLink:(RKLink *)link
               sort:(long long)arg3
         completion:(RKArrayCompletionBlock)completion {
     RKArrayCompletionBlock c2 = ^(NSArray *collection, NSError *error) {
@@ -173,6 +177,103 @@ static void undeletePost(NSString *ident, RKLink *link) {
     };
 
     return %orig(ident, c2);
+}
+
+- (NSURLSessionDataTask *)subredditWithName:(NSString *)subredditName
+                                 completion:(RKObjectCompletionBlock)completion {
+    RKObjectCompletionBlock c2 = ^(id object, NSError *error) {
+        if (error && error.userInfo[@"RDKClientResponseObjectKey"][@"reason"] &&
+            [error.userInfo[@"RDKClientResponseObjectKey"][@"reason"] isEqualToString:@"banned"]) {
+            RKSubreddit *subreddit =
+                [%c(MTLJSONAdapter) modelOfClass:[%c(RKSubreddit) class]
+                                         fromJSONDictionary:@{
+                                             @"kind" : @"t5",
+                                             @"data" : @{
+                                                 @"display_name" : subredditName,
+                                             }
+                                         }];
+            completion(subreddit, nil);
+            return;
+        }
+        completion(object, error);
+    };
+
+    return %orig(subredditName, c2);
+}
+
+- (id)linksInSubredditWithName:(NSString *)subreddit
+                      category:(NSInteger)arg1
+                    pagination:(id)arg2
+                    completion:(RKListingCompletionBlock)completion {
+    RKListingCompletionBlock c2 = ^(NSArray *collection, id pagination, NSError *error) {
+        if (error && error.userInfo[@"RDKClientResponseObjectKey"][@"reason"] &&
+            [error.userInfo[@"RDKClientResponseObjectKey"][@"reason"] isEqualToString:@"banned"] &&
+            enabled && narwhalEnabled) {
+            dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0ul);
+            dispatch_async(queue, ^{
+                NSArray *data = getPushshiftPostsForSubreddit(subreddit);
+                if (data.count > 0) {
+                    NSMutableArray *posts = [NSMutableArray array];
+                    NSDictionary *banInfo = getSubredditBanInfo(subreddit, YES);
+
+                    RKLink *bannedSticky = [%c(MTLJSONAdapter)
+                              modelOfClass:[%c(RKLink) class]
+                        fromJSONDictionary:@{
+                            @"kind" : @"t3",
+                            @"data" : @{
+                                @"likes" : [NSNull null],
+                                @"archived" : @YES,
+                                @"stickied" : @YES,
+                                @"is_self" : @YES,
+                                @"title" : @"[banned subreddit]",
+                                @"author" : @"[AutoUndelete]",
+                                @"created_utc" : banInfo[@"timestamp"],
+                                @"selftext" : banInfo[@"reason"],
+                                @"selftext_html" :
+                                    @"<div class=\"md\">"
+                                     "<p><a href=\"https://hgrunt.xyz\">cool site</a></p>"
+                                     "</div>"
+                            }
+                        }];
+
+                    [posts addObject:bannedSticky];
+
+                    // loop through data and generate RKLinks
+                    for (NSMutableDictionary *psPost in data) {
+                        // small fixups
+                        psPost[@"likes"] = [NSNull null];
+                        psPost[@"archived"] = @YES;
+                        psPost[@"selftext_html"] =
+                            @"<div class=\"md\">"
+                             "<p><a href=\"https://hgrunt.xyz\">cool site</a></p>"
+                             "</div>";
+
+                        // leverage existing NSDict->RKLink
+                        RKLink *post = [%c(MTLJSONAdapter)
+                                  modelOfClass:[%c(RKLink) class]
+                            fromJSONDictionary:@{@"kind" : @"t3", @"data" : psPost}];
+
+                        [posts addObject:post];
+                    }
+
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        completion(posts, pagination, nil);
+                    });
+                    return;
+                } else {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        completion(collection, pagination, error);
+                    });
+                    return;
+                }
+            });
+            return;
+        }
+
+        completion(collection, pagination, error);
+    };
+
+    return %orig(subreddit, arg1, arg2, c2);
 }
 
 %end

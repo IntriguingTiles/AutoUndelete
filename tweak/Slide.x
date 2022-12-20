@@ -83,6 +83,7 @@ static void undeletePost(NSString *ident, NSMutableDictionary *link) {
         link[@"author_flair_text"] = link[@"selftext"];
         link[@"selftext_html"] = markdownToHTML(post[@"selftext"]);
         link[@"author"] = post[@"author"];
+        link[@"title"] = post[@"title"];
         if (highlight) link[@"distinguished"] = @"special";
     }
 }

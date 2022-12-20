@@ -8,6 +8,7 @@ static BOOL highlight;
 static BOOL useIDs;
 
 typedef void (^AFSuccessCompletionBlock)(NSURLSessionDataTask *dataTask, id response);
+typedef void (^AFFailureCompletionBlock)(NSURLSessionDataTask *dataTask, NSError *error);
 
 static BOOL shouldUndelete(NSArray *comments) {
     for (NSDictionary *outerComment in comments) {
@@ -83,6 +84,8 @@ static void undeletePost(NSString *ident, NSMutableDictionary *link) {
 
     if (post) {
         link[@"author_flair_text"] = link[@"selftext"];
+        link[@"title"] = post[@"title"];
+        link[@"url"] = post[@"url"];
         link[@"selftext"] = post[@"selftext"];
         link[@"selftext_html"] = markdownToHTML(post[@"selftext"]);
         link[@"author"] = post[@"author"];
@@ -98,28 +101,110 @@ static void undeletePost(NSString *ident, NSMutableDictionary *link) {
                       headers:(NSDictionary<NSString *, NSString *> *)headers
                      progress:(void (^)(NSProgress *_Nonnull))downloadProgress
                       success:(AFSuccessCompletionBlock)success
-                      failure:(void (^)(NSURLSessionDataTask *_Nullable, NSError *_Nonnull))failure {
+                      failure:(AFFailureCompletionBlock)failure {
     AFSuccessCompletionBlock c2 = ^(NSURLSessionDataTask *dataTask, NSArray *response) {
-        if (enabled && baconReaderEnabled && [URLString containsString:@"/comments/"] &&
-            [URLString containsString:@".json"] && response && response.count >= 2) {
-            // cheating to make the response mutable without making every response mutable
-            NSData *json = [NSJSONSerialization dataWithJSONObject:response options:0 error:nil];
-            response = [NSJSONSerialization JSONObjectWithData:json
-                                                       options:NSJSONReadingMutableContainers
-                                                         error:nil];
-            NSString *ident = response[0][@"data"][@"children"][0][@"data"][@"id"];
-            NSArray *comments = response[1][@"data"][@"children"];
-            NSMutableDictionary *post = response[0][@"data"][@"children"][0][@"data"];
+        if (enabled && baconReaderEnabled) {
+            if ([URLString containsString:@"/comments/"] && [URLString containsString:@".json"] &&
+                response && response.count >= 2) {
+                // cheating to make the response mutable without making every response mutable
+                NSData *json = [NSJSONSerialization dataWithJSONObject:response
+                                                               options:0
+                                                                 error:nil];
+                response = [NSJSONSerialization JSONObjectWithData:json
+                                                           options:NSJSONReadingMutableContainers
+                                                             error:nil];
+                NSString *ident = response[0][@"data"][@"children"][0][@"data"][@"id"];
+                NSArray *comments = response[1][@"data"][@"children"];
+                NSMutableDictionary *post = response[0][@"data"][@"children"][0][@"data"];
 
-            if (ident && comments && post) {
-                if (shouldUndelete(comments)) undeleteComments(ident, comments);
-                if (isDeleted(post[@"selftext"])) undeletePost(ident, post);
+                if (ident && comments && post) {
+                    if (shouldUndelete(comments)) undeleteComments(ident, comments);
+                    if (isDeleted(post[@"selftext"])) undeletePost(ident, post);
+                }
             }
         }
         success(dataTask, response);
     };
 
-    return %orig(URLString, parameters, headers, downloadProgress, c2, failure);
+    AFFailureCompletionBlock c3 = ^(NSURLSessionDataTask *dataTask, NSError *error) {
+        NSData *data = error.userInfo[@"com.alamofire.serialization.response.error.data"];
+
+        if (data && enabled && baconReaderEnabled) {
+            // decode data
+            NSDictionary *info = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            if ([URLString containsString:@"/about.json"]) {
+                if (info && info[@"reason"] && [info[@"reason"] isEqualToString:@"banned"]) {
+                    // fake info and call success
+                    success(
+                        dataTask, @{
+                            @"data" : @{
+                                @"id" : @"notarealid",
+                                @"display_name" : [URLString
+                                    substringWithRange:NSMakeRange(3, URLString.length - 3 - 11)],
+                                @"url" : [URLString substringWithRange:NSMakeRange(0, URLString.length - 10)]
+                            }
+                        });
+                    return;
+                }
+            } else if ([URLString containsString:@"/r/"] && [URLString containsString:@".json"]) {
+                // likely fetching posts
+                if (info && info[@"reason"] && [info[@"reason"] isEqualToString:@"banned"]) {
+                    NSArray *data =
+                        getPushshiftPostsForSubreddit([URLString componentsSeparatedByString:@"/"][2]);
+                    NSMutableArray *posts = [NSMutableArray array];
+                    if (data.count > 0) {
+                        NSDictionary *banInfo =
+                            getSubredditBanInfo([URLString componentsSeparatedByString:@"/"][2], NO);
+
+                        [posts addObject:@{
+                            @"kind" : @"t3",
+                            @"data" : @{
+                                @"likes" : [NSNull null],
+                                @"archived" : @YES,
+                                @"stickied" : @YES,
+                                @"is_self" : @YES,
+                                @"title" : @"[banned subreddit]",
+                                @"author" : @"[AutoUndelete]",
+                                @"created_utc" : banInfo[@"timestamp"],
+                                @"selftext" : banInfo[@"reason"],
+                                @"selftext_html" : markdownToHTML(banInfo[@"reason"]),
+                                @"id" : @"notarealid",
+                                @"name" : @"t3_notarealid"
+                            }
+                        }];
+
+                        for (NSMutableDictionary *psPost in data) {
+                            psPost[@"likes"] = [NSNull null];
+                            psPost[@"archived"] = @YES;
+                            psPost[@"name"] = [NSString stringWithFormat:@"t3_%@", psPost[@"id"]];
+                            if ([psPost[@"selftext"] length] > 0)
+                                psPost[@"selftext_html"] = markdownToHTML(psPost[@"selftext"]);
+
+                            [posts addObject:@{@"kind" : @"t3", @"data" : psPost}];
+                        };
+
+                        success(
+                            dataTask, @{
+                                @"kind" : @"Listing",
+                                @"data" : @{
+                                    @"after" : [posts lastObject][@"data"][@"name"],
+                                    @"dist" : @26,
+                                    @"modhash" : @"",
+                                    @"geo_filter" : [NSNull null],
+                                    @"children" : posts,
+                                    @"before" : [NSNull null]
+                                }
+                            });
+                        return;
+                    }
+                }
+            }
+        }
+
+        failure(dataTask, error);
+    };
+
+    return %orig(URLString, parameters, headers, downloadProgress, c2, c3);
 }
 
 - (NSURLSessionDataTask *)POST:(NSString *)URLString

@@ -1,5 +1,6 @@
 #import <Common.h>
 #import <Foundation/Foundation.h>
+#import <headers/Apollo/MTLJSONAdapter.h>
 #import <headers/Apollo/RDKComment.h>
 #import <headers/Apollo/RDKLink.h>
 
@@ -10,6 +11,7 @@ static BOOL useIDs;
 
 typedef void (^RDKDictionaryCompletionBlock)(NSDictionary *collection, NSError *error);
 typedef void (^RDKArrayCompletionBlock)(NSArray *collection, NSError *error);
+typedef void (^RDKListingCompletionBlock)(NSArray *collection, id pagination, NSError *error);
 
 static BOOL shouldUndelete(NSArray *comments) {
     for (RDKComment *comment in comments) {
@@ -78,14 +80,19 @@ static void undeletePost(NSString *ident, RDKLink *link) {
     NSLog(@"Attempting to undelete post...");
     NSDictionary *post = getPushshiftPost(ident);
 
+    // it's possible for the pushshift response to still be [deleted] or [removed]
+    // but sometimes it still has more info than what reddit api returned so it's still worth trying
     if (post) {
         link.author = post[@"author"];
+        link.title = post[@"title"];
         link.authorFlairPlaintext = link.selfText;
         if (highlight) link.distinguished = 3;
         link.selfText = post[@"selftext"];
         link.selfTextHTML = @"<div class=\"md\">"
                              "<p><a href=\"https://hgrunt.xyz\">cool site</a></p>"
                              "</div>";
+        link.URL = [NSURL URLWithString:post[@"url"]];
+        link.selfPost = [post[@"is_self"] boolValue];
     }
 }
 
@@ -194,6 +201,80 @@ static void undeletePost(NSString *ident, RDKLink *link) {
     };
 
     return %orig(arg1, arg2, ident, c2);
+}
+
+- (id)linksInSubredditWithName:(NSString *)subreddit
+                      category:(NSInteger)arg1
+                    pagination:(id)arg2
+                    completion:(RDKListingCompletionBlock)completion {
+    RDKListingCompletionBlock c2 = ^(NSArray *collection, id pagination, NSError *error) {
+        if (error.code == 450 && enabled && apolloEnabled) {
+            // code 450 == banned subreddit
+            dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0ul);
+            dispatch_async(queue, ^{
+                NSArray *data = getPushshiftPostsForSubreddit(subreddit);
+                if (data.count > 0) {
+                    NSMutableArray *posts = [NSMutableArray array];
+                    NSDictionary *banInfo = getSubredditBanInfo(subreddit, YES);
+
+                    RDKLink *bannedSticky = [%c(MTLJSONAdapter)
+                              modelOfClass:[%c(RDKLink) class]
+                        fromJSONDictionary:@{
+                            @"kind" : @"t3",
+                            @"data" : @{
+                                @"likes" : [NSNull null],
+                                @"archived" : @YES,
+                                @"stickied" : @YES,
+                                @"is_self" : @YES,
+                                @"title" : @"[banned subreddit]",
+                                @"author" : @"[AutoUndelete]",
+                                @"created_utc" : banInfo[@"timestamp"],
+                                @"selftext" : banInfo[@"reason"],
+                                @"selftext_html" :
+                                    @"<div class=\"md\">"
+                                     "<p><a href=\"https://hgrunt.xyz\">cool site</a></p>"
+                                     "</div>"
+                            }
+                        }];
+
+                    [posts addObject:bannedSticky];
+
+                    // loop through data and generate RDKLinks
+                    for (NSMutableDictionary *psPost in data) {
+                        // small fixups
+                        psPost[@"likes"] = [NSNull null];
+                        psPost[@"archived"] = @YES;
+                        psPost[@"selftext_html"] =
+                            @"<div class=\"md\">"
+                             "<p><a href=\"https://hgrunt.xyz\">cool site</a></p>"
+                             "</div>";
+
+                        // leverage existing NSDict->RDKLink
+                        RDKLink *post = [%c(MTLJSONAdapter)
+                                  modelOfClass:[%c(RDKLink) class]
+                            fromJSONDictionary:@{@"kind" : @"t3", @"data" : psPost}];
+
+                        [posts addObject:post];
+                    }
+
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        completion(posts, pagination, nil);
+                    });
+                    return;
+                } else {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        completion(collection, pagination, error);
+                    });
+                    return;
+                }
+            });
+            return;
+        }
+
+        completion(collection, pagination, error);
+    };
+
+    return %orig(subreddit, arg1, arg2, c2);
 }
 
 %end
